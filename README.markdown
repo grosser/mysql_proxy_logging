@@ -1,0 +1,4 @@
+ - change port to 4040, host to localhost/127.0.0.1
+ - run
+ - comment out port setting
+ - replay path_to_rails_root times concurrency

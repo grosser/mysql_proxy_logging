@@ -3,6 +3,8 @@ require 'rubygems'
 require 'active_record'
 
 dir = ARGV[0] || raise('gimme rails dir as ARGV[0]')
+times = (ARGV[1] || 1).to_i
+concurrency = (ARGV[2] || 4).to_i
 logfile = 'mysql.log'
 
 def connect(dir)
@@ -10,16 +12,14 @@ def connect(dir)
   ActiveRecord::Base.establish_connection(config.merge(:port=>3306))
 end
 
-def replay(logfile)
-  sql = File.readlines(logfile).map do |line|
-    #2010-01-13 11:06:16    443 -- SELECT version FROM schema_migrations\n
-    line.split(' -- ',2)[1].strip
-  end
+def replay(logfile, concurrency)
+  #2010-01-13 11:06:16    443 -- SELECT version FROM schema_migrations\n
+  sql = File.read(logfile).split(/^\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d\s+\d+ -- /m).reject(&:empty?)
 
   puts "replaying #{sql.size} lines of sql ..."
 
   parallel(4, sql) do |line|
-    ActiveRecord::Base.connection.execute(line)
+    ActiveRecord::Base.connection.execute(line) rescue puts("corrupt line #{line}")
   end
 end
 
@@ -34,5 +34,8 @@ def parallel(count, data)
 end
 
 connect(dir)
-replay(logfile)
-
+times.times do
+  t = Time.now.to_i
+  replay(logfile, concurrency)
+  puts "#{Time.now.to_i - t} seconds (parallel: #{concurrency})"
+end
