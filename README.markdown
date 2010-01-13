@@ -1,4 +1,5 @@
 This is made to work alongside of a Rails application
+
  - git clone git://github.com/grosser/mysql_proxy_logging.git
  - cd mysql_proxy_logging
  - sudo apt-get install mysql-proxy
