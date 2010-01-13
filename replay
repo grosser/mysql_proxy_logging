@@ -1,41 +1,36 @@
 #!/usr/bin/env ruby
+STDOUT.sync=true
 require 'rubygems'
 require 'active_record'
 
-dir = ARGV[0] || raise('gimme rails dir as ARGV[0]')
-times = (ARGV[1] || 1).to_i
-concurrency = (ARGV[2] || 4).to_i
-logfile = 'mysql.log'
+logfile = ARGV[0]
+dir = ARGV[1]
+times = (ARGV[2] || 1).to_i
+sleep_time = (ARGV[3] || 0).to_f
 
 def connect(dir)
   config = YAML.load(File.read("#{dir}/config/database.yml"))['staging']
   ActiveRecord::Base.establish_connection(config.merge(:port=>3306))
 end
 
-def replay(logfile, concurrency)
+def replay(logfile)
   #2010-01-13 11:06:16    443 -- SELECT version FROM schema_migrations\n
   sql = File.read(logfile).split(/^\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d\s+\d+ -- /m).reject(&:empty?)
 
   puts "replaying #{sql.size} lines of sql ..."
 
-  parallel(4, sql) do |line|
+  sql.each do |line|
     ActiveRecord::Base.connection.execute(line) rescue puts("corrupt line #{line}")
   end
 end
 
-def parallel(count, data)
-  threads = []
-  data.in_groups_of(data.size/count, false).each do |group|
-    threads << Thread.new do
-      group.each{|x| yield(x)}
-    end
-  end
-  threads.each{|t| t.join}
-end
-
 connect(dir)
+time = 0.0
 times.times do
-  t = Time.now.to_i
-  replay(logfile, concurrency)
-  puts "#{Time.now.to_i - t} seconds (parallel: #{concurrency})"
+  current = Benchmark.realtime do
+    replay(logfile)
+  end
+  time += current
+  sleep sleep_time
+  puts "#{current} seconds (total: #{time})"
 end
