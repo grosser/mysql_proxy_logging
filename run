@@ -1,0 +1,10 @@
+#!/usr/bin/env ruby
+puts "change config to 127.0.0.1:4040"
+
+Process.fork do
+  system "mysql-proxy --proxy-lua-script=mysqllog.lua"
+end
+
+logfile = "mysql.log"
+`touch #{logfile}`
+system "tail -f #{logfile}"

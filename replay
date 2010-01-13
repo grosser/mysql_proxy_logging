@@ -1,0 +1,38 @@
+#!/usr/bin/env ruby
+require 'rubygems'
+require 'active_record'
+
+dir = ARGV[0] || raise('gimme rails dir as ARGV[0]')
+logfile = 'mysql.log'
+
+def connect(dir)
+  config = YAML.load(File.read("#{dir}/config/database.yml"))['staging']
+  ActiveRecord::Base.establish_connection(config.merge(:port=>3306))
+end
+
+def replay(logfile)
+  sql = File.readlines(logfile).map do |line|
+    #2010-01-13 11:06:16    443 -- SELECT version FROM schema_migrations\n
+    line.split(' -- ',2)[1].strip
+  end
+
+  puts "replaying #{sql.size} lines of sql ..."
+
+  parallel(4, sql) do |line|
+    ActiveRecord::Base.connection.execute(line)
+  end
+end
+
+def parallel(count, data)
+  threads = []
+  data.in_groups_of(data.size/count, false).each do |group|
+    threads << Thread.new do
+      group.each{|x| yield(x)}
+    end
+  end
+  threads.each{|t| t.join}
+end
+
+connect(dir)
+replay(logfile)
+
